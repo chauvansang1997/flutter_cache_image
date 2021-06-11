@@ -2,8 +2,6 @@ library cache_image;
 
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 class Resource {
@@ -14,7 +12,6 @@ class Resource {
 
   Uri _temp;
   Uri _local;
-  Uri _remote;
   Duration _retry;
 
   Resource(
@@ -22,7 +19,6 @@ class Resource {
       : assert(uri != null),
         _retry = duration;
 
-  Uri get remote => _remote;
   Uri get temp => _temp;
   Uri get local => _local;
 
@@ -37,8 +33,7 @@ class Resource {
 
   Future<Resource> init() async {
     _temp = await _getTempDir();
-    _remote = _parse(uri);
-    _local = _parse(_temp.path + '/' + _remote.hashCode.toString());
+    _local = _parse(_temp.path);
 
     return this;
   }
@@ -59,35 +54,4 @@ class Resource {
     return null;
   }
 
-  Future<Uint8List> storeFile() async {
-    File file = await File(_local.path).create(recursive: true);
-    // Check FireStorage scheme
-    if (_remote.scheme == 'gs') {
-      final StorageReference ref =
-          FirebaseStorage.instance.ref().child(_remote.path);
-      final dynamic url = await ref.getDownloadURL();
-      _remote = Uri.parse(url);
-    }
-    // Download file with retry
-    while (file.lengthSync() <= 0) {
-      await Future.delayed(_retry).then((_) async {
-        try {
-          HttpClient httpClient = new HttpClient();
-          final HttpClientRequest request = await httpClient.getUrl(_remote);
-          final HttpClientResponse response = await request.close();
-          final Uint8List bytes = await consolidateHttpClientResponseBytes(
-              response,
-              autoUncompress: false);
-          file = await file.writeAsBytes(bytes);
-        } catch (err) {
-          _retry += _retry * this.durationMultiplier;
-        }
-      });
-      // Check duration expiration
-      if (_retry > this.durationExpiration) {
-        break;
-      }
-    }
-    return file.readAsBytesSync();
-  }
 }

@@ -52,8 +52,6 @@ class CacheImage extends ImageProvider<CacheImage> {
     final bool check = await _resource.checkFile();
     if (check) {
       file = await _resource.getFile();
-    } else {
-      file = await _resource.storeFile();
     }
     if (file.length > 0) {
       return PaintingBinding.instance.instantiateImageCodec(file);
